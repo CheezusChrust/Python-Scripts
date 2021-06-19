@@ -6,11 +6,11 @@ import requests
 from datetime import datetime
 
 bot = commands.Bot(command_prefix="%", help_command=None)
-TOKEN = "YOUR-TOKEN-HERE"
+TOKEN = "YOUR_TOKEN"
 servers = {
-    "646366": {
-        "name": "Avtomat Events Build & Practice",
-        "flag": ":flag_us:"
+    "646366": { #ID of the server on trackyserver.com
+        "name": "Avtomat Events Build & Practice", #Display name of the server
+        "flag": ":flag_us:" #Location flag that will display next to the server name
     },
     "655993": {
         "name": "Malleus Gaming Sandbox",
@@ -30,72 +30,67 @@ servers = {
     }
 }
 
+def curTime():
+    return datetime.now().strftime("%I:%M:%S%p")
+
+def log(msg):
+    print("[" + curTime() + "] " + msg)
+
 @bot.event
 async def on_ready():
-    print('We have logged in as {0.user}'.format(bot))
-    game = discord.Game("%help for info")
+    log(f"We have logged in as {bot.user}")
+    game = discord.Game(f"Monitoring {len(servers)} servers | %monitor to begin monitoring")
     await bot.change_presence(status=discord.Status.online, activity=game)
-
-@bot.command()
-async def help(ctx):
-    commands = [
-        "**%ping** - Display the bot's current ping",
-        "**%help** - Display this help message",
-        "**%monitor** - Monitor servers in this channel (Admin only)"
-    ]
-    embed = discord.Embed(title=":information_source: Information", description="\n".join(commands), color=0x00ff00)
-    await ctx.send(embed=embed)
-
-@bot.command()
-async def ping(ctx):
-    embed = discord.Embed(title=":computer: Websocket Latency: " + str(math.floor(bot.latency * 1000)) + "ms", color=0x00ff00)
-    await ctx.send(embed=embed)
 
 def generateServerStatusEmbed():
     embed = discord.Embed(title=":computer: Build Server List", description="These are the servers that we've determined are decent for building & testing on.")
-    try:
-        for id, data in servers.items():
+    
+    count = 0
+
+    for id, data in servers.items():
+        try:
             req = requests.get("https://api.trackyserver.com/widget/index.php?id=" + id).json()
             if req["playerscount"] == "offline":
                 req["map"] = "N/A"
             embed.add_field(name=data["flag"] + " " + data["name"] + " (" + req["playerscount"] + ") - " + req["map"], value="steam://connect/" + req["ip"], inline=False)
-    except:
-        print("[" + datetime.now().strftime("%I:%M:%S%p") + "] Error contacting api.trackyserver.com")
-        embed.add_field(name="\u200b", value="*Error contacting api.trackyserver.com*", inline=False)
-    embed.add_field(name="\u200b", value="Last updated at " + datetime.now().strftime("%I:%M:%S%p") + " EST")
+            
+            count = count + 1
+        except:
+            log(f"Failed to get JSON data for server {id} ({data['name']})")
+
+    if count == 0:
+        embed.add_field(name="\u200b", value="*No servers defined, or problem contacting api.trackyserver.com*", inline=False)
+
+    embed.add_field(name="\u200b", value="Last updated at " + curTime() + " EST")
     return embed
 
-tasks = {}
-
-#1. If message in channel, delete it
-#2. Post status message
-#3. Edit status message with updates every few minutes
 async def serverMonitor(ctx):
-    async for message in ctx.channel.history(limit=2):
-        await message.delete()
+    #Delete command message, and message before if said message was by the monitor bot
+    await ctx.message.delete()
+    async for message in ctx.channel.history(limit=1):
+        if message.author == bot.user:
+            await message.delete()
 
     msg = await ctx.send(embed=generateServerStatusEmbed())
 
     while True:
-        await asyncio.sleep(120)
+        await asyncio.sleep(300)
         await msg.edit(embed=generateServerStatusEmbed())
 
+tasks = {}
 @bot.command()
 @commands.has_guild_permissions(administrator=True)
 async def monitor(ctx):
-    if "main" in tasks:
+    if "main" in tasks: #If we monitor in a new channel, stop the task monitoring in the old one
         tasks["main"].cancel()
     tasks["main"] = asyncio.create_task(serverMonitor(ctx))
 
-#Error handling
 @bot.event
 async def on_command_error(ctx, error):
-    time = "[" + datetime.now().strftime("%I:%M:%S%p") + "] "
-
     if isinstance(error, commands.MissingPermissions):
         await ctx.send(str(error))
-        print(time + str(error))
+        log(str(error))
     else:
-        print(time + str(error))
+        log(str(error))
 
 bot.run(TOKEN)
