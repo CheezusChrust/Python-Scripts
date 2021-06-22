@@ -31,7 +31,7 @@ servers = {
 }
 
 def curTime():
-    return datetime.now().strftime("%I:%M:%S%p")
+    return datetime.now().strftime("%Y-%m-%d %I:%M:%S%p")
 
 def log(msg):
     print("[" + curTime() + "] " + msg)
