@@ -3,39 +3,10 @@ import asyncio
 import a2s
 from datetime import datetime
 import sys
+from loguru import logger
 
-#Uncomment the following two lines to enable detailed logging
-#import logging
+import logging
 #logging.basicConfig(level=logging.DEBUG)
-
-#This fixes WinError 10038 when running the bot on Windows
-if sys.platform != 'win32':
-    def patch():
-        pass
-else:
-    def patch():
-        """Patch selectors.SelectSelector to fix WinError 10038 in Windows
-
-        Ref: https://bugs.python.org/issue33350
-        """
-
-        import select
-        from selectors import SelectSelector
-
-        def _select(self, r, w, _, timeout=None):
-            try:
-                r, w, x = select.select(r, w, w, timeout)
-            except OSError as e:
-                if hasattr(e, 'winerror') and e.winerror == 10038:
-                    # descriptors may already be closed
-                    return [], [], []
-                raise
-            else:
-                return r, w + x, []
-
-        SelectSelector._select = _select
-
-patch()
 
 TOKEN = "" #Your bot token
 GUILD_ID = 0 #Right click your server icon and hit "Copy ID"
@@ -67,7 +38,8 @@ servers = [
         "port": 27015,
         "flag": ":flag_de:",
         "extrainfo": {
-            "ACF Version": "ACF3"
+            "ACF Version": "ACF3",
+            "Notes": "No Starfall"
         }
     },
     {
@@ -80,10 +52,10 @@ servers = [
         }
     },
     {
-        "ip": "31.214.246.79", #Lumos
-        "shortname": "Lumos",
-        "port": 27015,
-        "flag": ":flag_gb:",
+        "ip": "116.202.240.95", #AWM Builders
+        "shortname": "LUMOS Builder's Paradise",
+        "port": 27045,
+        "flag": ":flag_de:",
         "extrainfo": {
             "ACF Version": "ACF2 + ACF Custom"
         }
@@ -104,10 +76,8 @@ bot = interactions.Client(token=TOKEN)
 def curTime():
     return datetime.now().strftime("%Y-%m-%d %I:%M:%S%p")
 
-def log(str):
-    print("[" + curTime() + "]", str)
-
 embedFields = []
+
 async def serverMonitor(msg):
     while True:
         embedFields.clear()
@@ -119,9 +89,10 @@ async def serverMonitor(msg):
 
                 try:
                     data = await a2s.ainfo((server["ip"], server["port"]), 0.25)
-                except:
+                except asyncio.exceptions.TimeoutError:
                     pass
-                    #log("Warning: could not contact " + server["shortname"])
+                except Exception as e:
+                    logger.exception(e)
 
                 nameStr = ""
                 valueStr = "**Current player count:** N/A\n**Current map:** N/A"
@@ -161,7 +132,7 @@ async def serverMonitor(msg):
 
             await msg.edit(content="\u200b", embeds=embed)
         except Exception as e:
-            log(e)
+            logging.exception(e)
 
         await asyncio.sleep(30)
 
@@ -189,6 +160,6 @@ async def monitor(ctx: interactions.CommandContext):
 
 @bot.event
 async def on_ready():
-    log("Ready to begin monitoring!")
+    logger.debug("Ready to begin monitoring!")
 
 bot.start()
