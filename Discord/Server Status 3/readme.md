@@ -1,6 +1,7 @@
 # Requirements:
 - discord-py-interactions
 - python-a2s
+- loguru
 
 # Usage:
 - Define servers in server list
